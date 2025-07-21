@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The Rivchat Global</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="icon" href="https://via.placeholder.com/32x32/8B1538/FFFFFF?text=RG" type="image/x-icon">
+  <style>
+    :root {
+      --wine: #8B1538;
+      --beige: #F5F5DC;
+      --light-wine: #A0522D;
+    }
+    body {
+      background-color: var(--beige);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .wine-text { color: var(--wine); }
+    .wine-border { border-color: var(--wine); }
+    .wine-bg { background-color: var(--wine); }
+    .wine-hover:hover { background-color: var(--light-wine); }
+    #messages {
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--wine) var(--beige);
+      overflow-y: auto;
+      overflow-x: hidden;
+      word-wrap: break-word;
+    }
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track { background: var(--beige); }
+    #messages::-webkit-scrollbar-thumb { background-color: var(--wine); }
+    .message {
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .emoji-picker {
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+    }
+    .emoji-btn:hover {
+      transform: scale(1.2);
+    }
+    #nameModal {
+      backdrop-filter: blur(5px);
+    }
+    .logo-img {
+  width: 90px;
+  height: auto;
+  right: 10px;
+  position: relative;
+  display: block;
+}
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <!-- Name Input Modal -->
+  <div id="nameModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-8 max-w-md w-full">
+      <h2 class="text-2xl font-bold wine-text mb-4">Enter Your Name To Chat</h2>
+      <input type="text" id="userName" class="w-full px-4 py-3 border-2 wine-border rounded-xl text-lg wine-text mb-4" 
+             placeholder="Your Chat Name" maxlength="20" required>
+      <button id="startChatBtn" class="w-full px-6 py-3 wine-bg text-beige rounded-xl hover:wine-hover transition-all duration-200">
+        Start Chatting
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat Container (initially hidden) -->
+  <div id="chatContainer" class="w-full max-w-2xl hidden">
+     <div class="image-container">
+    <a href="index.html" >
+<img src="./back-button.png" class="logo-img" alt="Back Button">
+  </div>
+</a>
+    <div class="text-center mb-6">
+      <h1 class="text-4xl font-bold wine-text mb-2">🌍 The Rivchat Global</h1>
+      <p class="text-lg wine-text opacity-75">Connect with the world, one message at a time</p>
+    </div>
+
+    <div class="bg-white/20 backdrop-blur-sm rounded-2xl shadow-2xl p-6">
+      <div id="messages" class="h-96 mb-4 p-4 border-2 wine-border rounded-xl"></div>
+      
+      <div class="flex gap-2 mb-2">
+        <input type="text" id="messageInput" 
+          class="flex-1 px-4 py-3 border-2 wine-border rounded-xl text-lg wine-text placeholder-wine/50 focus:outline-none focus:ring-2 focus:ring-wine"
+          placeholder="Type your message here..." maxlength="500" />
+        <button id="emojiBtn" 
+          class="px-4 py-3 wine-bg text-beige rounded-xl hover:wine-hover transition-all duration-200">
+          <i class="fas fa-smile text-xl"></i>
+        </button>
+        <button id="sendBtn" 
+          class="px-6 py-3 wine-bg text-beige rounded-xl hover:wine-hover transition-all duration-200">
+          <i class="fas fa-paper-plane text-xl"></i>
+        </button>
+      </div>
+
+      <div id="emojiPicker" class="emoji-picker grid grid-cols-8 gap-2 p-2 bg-white rounded-xl border-2 wine-border">
+        <!-- Emojis will be populated by JS -->
+      </div>
+
+      <div class="flex items-center justify-between text-sm wine-text/70 mt-2">
+        <span id="charCount">0/500</span>
+        <button id="clearBtn" class="hover:text-wine">
+          <i class="fas fa-trash mr-1"></i>Clear Chat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Firebase configuration
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, orderBy, query, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQKQP8gPn_4-7WsM9ksvmOhoFUB7oxRF4",
+      authDomain: "the-rivchat-global.firebaseapp.com",
+      projectId: "the-rivchat-global",
+      storageBucket: "the-rivchat-global.firebasestorage.app",
+      messagingSenderId: "25534554645",
+      appId: "1:25534554645:web:6a2aac743f3b655813641c",
+      measurementId: "G-ETX92FBTH1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // DOM elements
+    const nameModal = document.getElementById('nameModal');
+    const chatContainer = document.getElementById('chatContainer');
+    const userNameInput = document.getElementById('userName');
+    const startChatBtn = document.getElementById('startChatBtn');
+    const messagesDiv = document.getElementById('messages');
+    let currentUser = '';
+
+    // Profanity filter
+    const profanityWords = [
+      'FUCK', 'FUCKYOU', 'FUCK YOU', 'ASS', 'ASSHOLE', 'BITCH', 'WHORE', 
+      'LIKMYASS', 'LIK MY ASS', 'VAGINA', 'FUCKME', 'FUCK ME', 'AYREFIK', 
+      'AYRE FIK', 'KES EMAK', 'KESEMAK', 'KESE5TAK', 'KESEKHTAK', 
+      'KES EKHTAK', 'KES E5TAK', 'AYRE', 'AYREFIK', 'AYRE FIK', 
+      'AYREBIE5TAK', 'EYREBI E5TAK', 'AYREBIEKHTAK', 'AYREBIEMAK',
+      'AYREBIAMEK', 'KOS EKHT HAL MANTI2', 'AYREBIHAL MANTI2', 
+      'KESIK TAYIB', 'LAHLOUBE', 'FUCK YOUR MOM', 'BITCH', 'CHARMOUTA',
+      'شرموطة', 'شرموط', 'كس أمك', 'كس', 'أير', 'أيري فيك'
+    ];
+
+    function filterProfanity(text) {
+      let filtered = text;
+      profanityWords.forEach(word => {
+        const regex = new RegExp(word, 'gi');
+        filtered = filtered.replace(regex, '*'.repeat(word.length));
+      });
+      return filtered;
+    }
+
+    // Handle name input
+    startChatBtn.addEventListener('click', () => {
+      const name = userNameInput.value.trim();
+      if (name) {
+        currentUser = name.substring(0, 20);
+        nameModal.style.display = 'none';
+        chatContainer.classList.remove('hidden');
+      } else {
+        alert('Please enter a name to continue');
+      }
+    });
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const emojiPicker = document.getElementById('emojiPicker');
+    const clearBtn = document.getElementById('clearBtn');
+    const charCount = document.getElementById('charCount');
+
+    // Emojis array
+    const emojis = ['😊', '😂', '❤️', '👍', '🎉', '🔥', '✨', '💯', '🌟', '🤔', '😍', '🥳', '🙌', '👏', '💪', '🎯', '🌈', '⭐'];
+
+    // Populate emoji picker
+    emojis.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.className = 'emoji-btn text-2xl p-1 hover:bg-gray-100 rounded';
+      btn.textContent = emoji;
+      btn.onclick = () => input.value += emoji;
+      emojiPicker.appendChild(btn);
+    });
+
+    // Toggle emoji picker
+    emojiBtn.addEventListener('click', () => {
+      emojiPicker.style.display = emojiPicker.style.display === 'grid' ? 'none' : 'grid';
+    });
+
+    // Character counter
+    input.addEventListener('input', () => {
+      charCount.textContent = `${input.value.length}/500`;
+    });
+
+    // Send message
+    const sendMessage = async () => {
+      const text = filterProfanity(input.value.trim());
+      if (text && currentUser) {
+        try {
+          await addDoc(collection(db, 'messages'), {
+            text,
+            username: currentUser,
+            timestamp: serverTimestamp()
+          });
+          input.value = '';
+          charCount.textContent = '0/500';
+          emojiPicker.style.display = 'none';
+        } catch (error) {
+          console.error('Error sending message:', error);
+        }
+      }
+    };
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Listen for messages
+    const q = query(collection(db, 'messages'), orderBy('timestamp', 'asc'));
+    onSnapshot(q, (snapshot) => {
+      messagesDiv.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bg-white/40 rounded-lg p-3 mb-2 wine-text overflow-hidden break-words max-w-full';
+        msgDiv.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="font-bold wine-text">${data.username || 'Anonymous'}:</span>
+              <p class="text-lg break-words whitespace-normal">${data.text}</p>
+            </div>
+            <button class="delete-btn ml-2 text-wine/50 hover:text-wine" data-id="${doc.id}">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <small class="text-wine/50 text-xs">${data.timestamp?.toDate().toLocaleTimeString() || 'Sending...'}</small>
+        `;
+        messagesDiv.appendChild(msgDiv);
+      });
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // Clear chat (local only - just clears the view)
+    clearBtn.addEventListener('click', () => {
+      if (confirm('Clear all messages from your view? This will not delete messages for others.')) {
+        messagesDiv.innerHTML = '';
+      }
+    });
+
+    // Delete individual message (only if it's the user's own message)
+    messagesDiv.addEventListener('click', async (e) => {
+      if (!currentUser) return;
+      
+      if (e.target.classList.contains('fa-times') || e.target.parentElement.classList.contains('delete-btn')) {
+        const deleteBtn = e.target.closest('.delete-btn') || e.target.parentElement;
+        const id = deleteBtn.dataset.id;
+        const messageDiv = deleteBtn.closest('.message');
+        const messageUsername = messageDiv.querySelector('.font-bold').textContent.replace(':', '').trim();
+        
+        if (id && messageUsername === currentUser) {
+          if (confirm('Delete this message?')) {
+            await deleteDoc(doc(db, 'messages', id));
+          }
+        } else if (messageUsername !== currentUser) {
+          deleteBtn.style.display = 'none'; // Hide delete button for other users' messages
+        }
+      }
+    });
+
+    // Hide delete buttons for other users' messages when loading
+    onSnapshot(q, (snapshot) => {
+      messagesDiv.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bg-white/40 rounded-lg p-3 mb-2 wine-text overflow-hidden break-words max-w-full';
+        
+        // Only show delete button if it's the current user's message
+        const showDeleteBtn = data.username === currentUser;
+        
+        msgDiv.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="font-bold wine-text">${data.username || 'Anonymous'}:</span>
+              <p class="text-lg break-words whitespace-normal">${data.text}</p>
+            </div>
+            ${showDeleteBtn ? 
+              `<button class="delete-btn ml-2 text-wine/50 hover:text-wine" data-id="${doc.id}">
+                <i class="fas fa-times"></i>
+              </button>` : ''}
+          </div>
+          <small class="text-wine/50 text-xs">${data.timestamp?.toDate().toLocaleTimeString() || 'Sending...'}</small>
+        `;
+        messagesDiv.appendChild(msgDiv);
+      });
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // Close emoji picker when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+        emojiPicker.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
